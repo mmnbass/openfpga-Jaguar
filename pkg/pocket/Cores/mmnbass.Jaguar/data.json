@@ -8,12 +8,7 @@
         "required": true,
         "parameters": "0x09",
         "extensions": [
-          "jag",
-          "j64",
-          "rom",
-          "bin",
-          "abs",
-          "cof"
+          "j64"
         ],
         "address": "0x10000000"
       },

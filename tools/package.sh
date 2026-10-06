@@ -34,7 +34,8 @@ mkdir -p "$STAGE/Assets/jaguar/common" dist
 
 # The boot ROM is deliberately NOT shipped.
 cat > "$STAGE/Assets/jaguar/common/PUT_ROMS_HERE.txt" <<'TXT'
-Place Jaguar cartridge images here (.jag .j64 .rom .bin).
+Place Jaguar cartridge images here: .j64 files (full cartridge dumps,
+including the 8 KB header).
 
 You must also supply the Jaguar boot ROM as:
 
