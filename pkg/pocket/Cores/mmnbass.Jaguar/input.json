@@ -1,0 +1,52 @@
+{
+  "input": {
+    "magic": "APF_VER_1",
+    "controllers": [
+      {
+        "type": "default",
+        "mappings": [
+          {
+            "id": 0,
+            "name": "A",
+            "key": "pad_btn_a"
+          },
+          {
+            "id": 1,
+            "name": "B",
+            "key": "pad_btn_b"
+          },
+          {
+            "id": 2,
+            "name": "X (keypad, see settings)",
+            "key": "pad_btn_x"
+          },
+          {
+            "id": 3,
+            "name": "C",
+            "key": "pad_btn_y"
+          },
+          {
+            "id": 10,
+            "name": "L (keypad, see settings)",
+            "key": "pad_trig_l"
+          },
+          {
+            "id": 11,
+            "name": "R (keypad, see settings)",
+            "key": "pad_trig_r"
+          },
+          {
+            "id": 20,
+            "name": "Pause",
+            "key": "pad_btn_start"
+          },
+          {
+            "id": 21,
+            "name": "Option / hold: keypad",
+            "key": "pad_btn_select"
+          }
+        ]
+      }
+    ]
+  }
+}

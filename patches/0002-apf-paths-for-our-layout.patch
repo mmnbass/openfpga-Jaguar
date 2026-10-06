@@ -1,0 +1,54 @@
+# The APF files assume the core-template layout (project at src/fpga/, APF at
+# src/fpga/apf/). Our layout puts the project in projects/ and APF in
+# platform/pocket/, so three hard-coded relative paths need dealing with:
+#   - mf_datatable.v     init_file, resolved relative to the declaring .qip dir
+#   - build_id_gen.tcl   output paths, resolved relative to the project dir
+#   - apf_constraints.sdc  its read_sdc of "core/core_constraints.sdc" raised
+#       "Critical Warning (332012) ... file not found". The line is REMOVED
+#       rather than retargeted, because core_constraints.sdc is already
+#       declared as an SDC_FILE in target/pocket/core.qip and retargeting
+#       would load it twice. openfpga-SNES removes it the same way.
+--- refs/core-template/src/fpga/apf/mf_datatable.v	2026-10-02 14:51:04
++++ platform/pocket/mf_datatable.v	2026-10-02 21:37:37
+@@ -105,7 +105,7 @@
+ 		altsyncram_component.clock_enable_output_a = "BYPASS",
+ 		altsyncram_component.clock_enable_output_b = "BYPASS",
+ 		altsyncram_component.indata_reg_b = "CLOCK1",
+-		altsyncram_component.init_file = "./apf/build_id.mif",
++		altsyncram_component.init_file = "./build_id.mif",
+ 		altsyncram_component.intended_device_family = "Cyclone V",
+ 		altsyncram_component.lpm_type = "altsyncram",
+ 		altsyncram_component.numwords_a = 256,
+--- refs/core-template/src/fpga/apf/build_id_gen.tcl	2026-10-02 14:51:04
++++ platform/pocket/build_id_gen.tcl	2026-10-02 21:37:37
+@@ -71,7 +71,7 @@
+ 	set buildTime [ clock format [ clock seconds ] -format %H%M%S ]
+ 		
+ 	# Create a Verilog file for output
+-	set outputFileName "apf/build_id.v"
++	set outputFileName "../platform/pocket/build_id.v"
+ 	set outputFile [open $outputFileName "w"]
+ 	
+ 	# Output the Verilog source
+@@ -129,7 +129,7 @@
+ 	set memoryDepth [expr $buildDateNumBytes + $buildTimeNumBytes]
+ 	
+ 	# Create a Memory Initialization File for output
+-	set outputFileName "apf/build_id.mif"
++	set outputFileName "../platform/pocket/build_id.mif"
+ 	set outputFile [open $outputFileName "w"]
+ 	
+ 	# Output the MIF header (see: http://quartushelp.altera.com/current/mergedProjects/reference/glossary/def_mif.htm)
+--- refs/core-template/src/fpga/apf/apf_constraints.sdc	2026-10-02 14:51:04
++++ platform/pocket/apf_constraints.sdc	2026-10-02 21:37:37
+@@ -17,4 +17,7 @@
+ 
+ 
+ # load in user constraints 
+-read_sdc "core/core_constraints.sdc"
+\ No newline at end of file
++# core_constraints.sdc is declared as an SDC_FILE in
++# target/pocket/core.qip, so loading it again here is redundant.
++# The original line pointed at "core/core_constraints.sdc",
++# which raised Critical Warning 332012 in our layout.
+\ No newline at end of file

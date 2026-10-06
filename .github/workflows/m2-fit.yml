@@ -1,0 +1,136 @@
+# MILESTONE 2 — full fit + timing attribution for the Pocket project.
+#
+# Answers the two questions M1 cannot: how much of Pocket does this actually
+# use, and where are the timing failures (docs/08 section 8.8, open question Q8).
+name: M2 — Pocket fit + timing
+
+on:
+  workflow_dispatch:
+    inputs:
+      quartus:
+        description: "Quartus image tag"
+        type: string
+        default: "21.1"
+      revision:
+        description: "Project revision to build"
+        type: choice
+        default: jaguar_pocket
+        options: [jaguar_pocket]
+      seed:
+        description: "Fitter seed (placement lottery)"
+        type: string
+        default: "1"
+      diag:
+        description: "Diagnostic build: readout overlay + SDRAM readback verifier (POCKET_DIAG)"
+        type: boolean
+        default: false
+      defines:
+        description: "Extra Verilog macros, space-separated (e.g. POCKET_STALL_ONTIME)"
+        type: string
+        default: ""
+
+jobs:
+  fit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free up runner disk
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+                      /usr/local/share/boost "$AGENT_TOOLSDIRECTORY" || true
+          df -h /
+
+      # Last assignment wins in a .qsf, so appending overrides any SEED above.
+      - name: Set fitter seed
+        run: echo "set_global_assignment -name SEED ${{ inputs.seed || '1' }}" >> projects/${{ inputs.revision || 'jaguar_pocket' }}.qsf
+
+      - name: Diagnostic build (POCKET_DIAG)
+        if: ${{ inputs.diag }}
+        run: echo 'set_global_assignment -name VERILOG_MACRO "POCKET_DIAG=1"' >> projects/${{ inputs.revision || 'jaguar_pocket' }}.qsf
+
+      - name: Extra Verilog macros
+        if: ${{ inputs.defines != '' }}
+        run: |
+          for m in ${{ inputs.defines }}; do
+            echo "set_global_assignment -name VERILOG_MACRO \"$m=1\"" >> projects/${{ inputs.revision || 'jaguar_pocket' }}.qsf
+          done
+          tail -3 projects/${{ inputs.revision || 'jaguar_pocket' }}.qsf
+
+      # NOTE: this step must be allowed to FAIL the job. An earlier version
+      # swallowed the exit code with `exit 0`, which made a failed compile show
+      # up as a green step and reported a fit that had never run.
+      - name: Full compile
+        id: compile
+        run: |
+          set -o pipefail
+          REV="${{ inputs.revision || 'jaguar_pocket' }}"
+          Q="docker run --rm -v ${{ github.workspace }}:/build -w /build/projects raetro/quartus:${{ inputs.quartus || '21.1' }}"
+          # Synthesis first, then a sanity gate, then fit. Twice an inferred RAM
+          # silently became ~16k flip-flops and the 40-minute fit failed at
+          # 108% / 143%. The Jaguar core has ~10-11k
+          # registers after synthesis; anything far above means a memory was
+          # not inferred, so stop here in ~5 minutes instead.
+          $Q quartus_map "$REV" 2>&1 | tee /tmp/fit.log
+          REGS=$(grep -m1 "Total registers" "projects/output_files/$REV.map.summary" | grep -oE "[0-9,]+" | tr -d ,)
+          echo "registers after synthesis: $REGS"
+          if [ "$REV" = "jaguar_pocket" ] && [ "${REGS:-0}" -gt 15000 ]; then
+            echo "::error::$REGS registers after synthesis (expected ~10-11k): a RAM was probably built from flip-flops"
+            exit 1
+          fi
+          $Q quartus_fit "$REV" 2>&1 | tee -a /tmp/fit.log
+          $Q quartus_asm "$REV" 2>&1 | tee -a /tmp/fit.log
+          # --flow compile used to run this; the split sequence must too, or
+          # there is no .sta.summary (multi-corner setup AND hold).
+          $Q quartus_sta "$REV" 2>&1 | tee -a /tmp/fit.log
+
+      - name: Timing attribution (Q8)
+        if: always()
+        run: |
+          docker run --rm -v "${{ github.workspace }}":/build -w /build/projects \
+            "raetro/quartus:${{ inputs.quartus || '21.1' }}" \
+            quartus_sta -t ../tools/timing-report.tcl "${{ inputs.revision || 'jaguar_pocket' }}" 2>&1 \
+            | tee /tmp/timing.log || true
+
+      - name: Resource breakdown
+        if: always()
+        run: |
+          python3 tools/parse-fit.py projects/output_files/${{ inputs.revision || 'jaguar_pocket' }}.fit.rpt --depth 2 \
+            | tee /tmp/entities.txt || true
+          python3 tools/parse-fit.py projects/output_files/${{ inputs.revision || 'jaguar_pocket' }}.fit.rpt \
+            --under "jaguar_top" --depth 4 | tee -a /tmp/entities.txt || true
+
+      - name: Job summary
+        if: always()
+        run: |
+          {
+            echo "## M2 — Pocket fit"
+            echo
+            echo "Compile exit: \`${{ steps.compile.outputs.rc }}\`"
+            echo '```'
+            cat projects/output_files/${{ inputs.revision || 'jaguar_pocket' }}.fit.summary 2>/dev/null || echo "(no fit summary)"
+            echo '```'
+            echo "### Resource utilization by entity"
+            echo '```'
+            head -60 /tmp/entities.txt 2>/dev/null || echo "(none)"
+            echo '```'
+            echo "### Failing paths by entity (Q8)"
+            echo '```'
+            sed -n '/FAILING PATHS BY ENTITY/,/UNCONSTRAINED/p' /tmp/timing.log 2>/dev/null | head -40 || echo "(none)"
+            echo '```'
+            echo "### Errors"
+            echo '```'
+            grep -E "^Error" /tmp/fit.log | head -30 || echo "(none)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: m2-fit-${{ inputs.revision || 'jaguar_pocket' }}-seed${{ inputs.seed || '1' }}${{ inputs.diag && '-diag' || '' }}${{ inputs.defines != '' && '-defs' || '' }}
+          path: |
+            projects/output_files/
+            /tmp/fit.log
+            /tmp/timing.log
+            /tmp/entities.txt

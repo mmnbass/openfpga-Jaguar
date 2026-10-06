@@ -1,0 +1,39 @@
+# Adds ch1_ontime: high when the most recent ch1 read was issued in the same
+# cycle as its request (dram_go_rd). Measured: such a
+# read has all 64 bits valid exactly 8 clk after the request, which is Tom's
+# consumption deadline at every MEMCON1 DRAM speed. The wrapper stalls Tom
+# (ram_rdy) only when this is low, instead of on every uncached read.
+--- rtl/upstream/mem/sdram_dual.sv
++++ rtl/upstream/mem/sdram_dual.sv
+@@ -70,6 +70,7 @@
+ 	input             ch1_rnw,     // 1 - read, 0 - write
+ 	input      [7:0]  ch1_be,      // Byte enable (bits) for burst writes. TODO
+ 	output reg        ch1_ready,
++	output reg        ch1_ontime = 1'b0, // last read was issued in its request cycle (Pocket port)
+ 	input             ch1_64,
+ 
+ 	input      [23:1] ch2_addr,    // 24 bit address for 8bit mode. addr[0] = 0 for 16bit mode for correct operations.
+@@ -240,6 +241,7 @@
+ 	end
+ 	if (ch1_reqr) begin
+ 		saved_addr <= ch1_addr;
++		ch1_ontime <= 0;            // set below only if the READ goes out this cycle
+ 	end
+ 	ch3_ready <= 0;
+ 
+@@ -375,6 +377,7 @@
+ 				command <= CMD_READ;
+ 				state   <= ch1_64 ? STATE_RW1 : STATE_IDLE_4;
+ 				data_ready_delay1[CAS_LATENCY+BURST_LENGTH+2] <= 1;
++				ch1_ontime <= ch1_reqr;     // taken at once: all 64 bits by go + 8
+ 				saved_addr <= ch1_reqr?ch1_addr[10:3]:saved_addr[10:3];
+ 				saved_wr   <= 0;
+ 				ch1_rqr <= 0;
+@@ -493,6 +496,7 @@
+ 		refresh_count <= startup_refresh_max - sdram_startup_cycles;
+ 		ch2_ready <= 0;
+ 		ch2_rd_busy <= 0;
++		ch1_ontime <= 0;
+ 	end
+ end
+ wire [3:0] ch_tmp = ch2_addr[23:20]==4'h5 ? ch3_addr[23:20] : ch2_addr[23:20]==4'h4 ? ch3_addr[19:16] : ch2_addr[23:20]==4'h3 ? ch3_addr[15:12]

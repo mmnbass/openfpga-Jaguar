@@ -1,0 +1,212 @@
+{
+  "interact": {
+    "magic": "APF_VER_1",
+    "variables": [
+      {
+        "name": "L Button",
+        "id": 20,
+        "type": "list",
+        "enabled": true,
+        "address": "0x40000018",
+        "persist": true,
+        "writeonly": true,
+        "defaultval": 0,
+        "options": [
+          {
+            "name": "Keypad *",
+            "value": 0
+          },
+          {
+            "name": "Keypad #",
+            "value": 1
+          },
+          {
+            "name": "Keypad 0",
+            "value": 2
+          },
+          {
+            "name": "Keypad 1",
+            "value": 3
+          },
+          {
+            "name": "Keypad 2",
+            "value": 4
+          },
+          {
+            "name": "Keypad 3",
+            "value": 5
+          },
+          {
+            "name": "Keypad 4",
+            "value": 6
+          },
+          {
+            "name": "Keypad 5",
+            "value": 7
+          },
+          {
+            "name": "Keypad 6",
+            "value": 8
+          },
+          {
+            "name": "Keypad 7",
+            "value": 9
+          },
+          {
+            "name": "Keypad 8",
+            "value": 10
+          },
+          {
+            "name": "Keypad 9",
+            "value": 11
+          }
+        ]
+      },
+      {
+        "name": "R Button",
+        "id": 21,
+        "type": "list",
+        "enabled": true,
+        "address": "0x4000001C",
+        "persist": true,
+        "writeonly": true,
+        "defaultval": 1,
+        "options": [
+          {
+            "name": "Keypad *",
+            "value": 0
+          },
+          {
+            "name": "Keypad #",
+            "value": 1
+          },
+          {
+            "name": "Keypad 0",
+            "value": 2
+          },
+          {
+            "name": "Keypad 1",
+            "value": 3
+          },
+          {
+            "name": "Keypad 2",
+            "value": 4
+          },
+          {
+            "name": "Keypad 3",
+            "value": 5
+          },
+          {
+            "name": "Keypad 4",
+            "value": 6
+          },
+          {
+            "name": "Keypad 5",
+            "value": 7
+          },
+          {
+            "name": "Keypad 6",
+            "value": 8
+          },
+          {
+            "name": "Keypad 7",
+            "value": 9
+          },
+          {
+            "name": "Keypad 8",
+            "value": 10
+          },
+          {
+            "name": "Keypad 9",
+            "value": 11
+          }
+        ]
+      },
+      {
+        "name": "X Button",
+        "id": 23,
+        "type": "list",
+        "enabled": true,
+        "address": "0x40000024",
+        "persist": true,
+        "writeonly": true,
+        "defaultval": 2,
+        "options": [
+          {
+            "name": "Keypad *",
+            "value": 0
+          },
+          {
+            "name": "Keypad #",
+            "value": 1
+          },
+          {
+            "name": "Keypad 0",
+            "value": 2
+          },
+          {
+            "name": "Keypad 1",
+            "value": 3
+          },
+          {
+            "name": "Keypad 2",
+            "value": 4
+          },
+          {
+            "name": "Keypad 3",
+            "value": 5
+          },
+          {
+            "name": "Keypad 4",
+            "value": 6
+          },
+          {
+            "name": "Keypad 5",
+            "value": 7
+          },
+          {
+            "name": "Keypad 6",
+            "value": 8
+          },
+          {
+            "name": "Keypad 7",
+            "value": 9
+          },
+          {
+            "name": "Keypad 8",
+            "value": 10
+          },
+          {
+            "name": "Keypad 9",
+            "value": 11
+          },
+          {
+            "name": "None",
+            "value": 12
+          }
+        ]
+      },
+      {
+        "name": "Keypad Modifier",
+        "id": 22,
+        "type": "list",
+        "enabled": true,
+        "address": "0x40000020",
+        "persist": true,
+        "writeonly": true,
+        "defaultval": 1,
+        "options": [
+          {
+            "name": "Off",
+            "value": 0
+          },
+          {
+            "name": "Select (hold)",
+            "value": 1
+          }
+        ]
+      }
+    ],
+    "messages": []
+  }
+}

@@ -1,0 +1,20 @@
+# Vendored upstream revisions
+#
+# Regenerate with tools/sync-upstream.sh. Do not hand-edit rtl/upstream/.
+
+Jaguar_MiSTer  43a761d77751bd1f84ca5e13d67c47838877539b  2026-08-12  flatten out the rework folder (#46)
+core-template  da3a021b1eaf742604d86d8dc9b33a6666263e6a  2023-05-03  v1.3.0
+openfpga-SNES  ad9fed4e9cbeee56f624ffcffc6477b2908daa3d  2026-08-25  [UPSTREAM] SA1: sync signal for DIV.
+
+Patches applied:
+  0001-optional-jaguar-cd.patch
+  0002-apf-paths-for-our-layout.patch
+  0003-abus-zero-size-array.patch
+  0004-sim-only-sdram-dq-single-driver.patch
+  0005-sdram-ch2-read-busy.patch
+  0006-sdram-ch1-ontime.patch
+  0007-sdram-ch1-rd-done.patch
+
+Removed from rtl/upstream/ on sync:
+  pll.qip, pll.v, pll/   - MiSTer 50 MHz PLL; Pocket generates its own (docs/03)
+  mem/ddram.sv           - DDR3 Avalon master; Pocket has no DDR3 (docs/04)

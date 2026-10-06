@@ -1,0 +1,23 @@
+# Adds ch1_rd_done: a one-clock pulse, high in the cycle after the last beat
+# of a 64-bit ch1 read is latched, i.e. while ch1_dout first holds the whole
+# word. The self-selecting block cache (rtl/blkcache.sv)
+# fills a missed word's upper half from ch1_dout on this pulse. ch1_ready is
+# not usable for this: STATE_IDLE re-asserts it every cycle.
+--- rtl/upstream/mem/sdram_dual.sv
++++ rtl/upstream/mem/sdram_dual.sv
+@@ -71,6 +71,7 @@
+ 	input      [7:0]  ch1_be,      // Byte enable (bits) for burst writes. TODO
+ 	output reg        ch1_ready,
+ 	output reg        ch1_ontime = 1'b0, // last read was issued in its request cycle (Pocket port)
++	output reg        ch1_rd_done = 1'b0,// pulse: a 64-bit ch1 read's word is complete in ch1_dout (Pocket port)
+ 	input             ch1_64,
+ 
+ 	input      [23:1] ch2_addr,    // 24 bit address for 8bit mode. addr[0] = 0 for 16bit mode for correct operations.
+@@ -222,6 +223,7 @@
+ 	if(data_ready_delay1[0]) ch1_dout[47:32] <= dq_reg;
+ 	if(data_ready_delay1[2] && ~ch1_64) ch1_ready <= 1;
+ 	if(data_ready_delay1[0] && ch1_64) ch1_ready <= 1;
++	ch1_rd_done <= data_ready_delay1[0] && ch1_64;   // high while ch1_dout holds the full word
+ 
+ 	if(data_ready_delay2[1]) ch2_dout[31:16] <= dq_reg;
+ 	if(data_ready_delay2[0]) ch2_dout[15:00] <= dq_reg;

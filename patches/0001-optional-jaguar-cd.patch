@@ -1,0 +1,53 @@
+--- refs/Jaguar_MiSTer/rtl/jaguar.v	2026-10-02 14:51:02
++++ rtl/upstream/jaguar.v	2026-10-02 20:41:45
+@@ -1464,6 +1464,19 @@
+ wire b_ee_din;
+ wire b_eint;
+ wire [31:0] cart_qt = b_doe ? b_dout : cart_q;
++// ---------------------------------------------------------------------------
++// Jaguar CD (Butch) -- optional.
++//
++// Measured at Milestone 0: _butch is 6,814 ALMs, 39% of the whole console and
++// larger than Tom. Keeping it puts the console at 17,608 ALMs, 95% of the
++// Analogue Pocket's 18,480, which leaves no room for the APF wrapper.
++// Removing it gives 10,794 ALMs (58%). See docs/08 section 8.1a.
++//
++// Define NO_JAGUAR_CD for a cart-only build. The else branch drives every
++// Butch output to its inactive level, so the cart data path, the 68000 data
++// bus and the I2S/EEPROM muxes all fall through to their non-CD behaviour.
++// ---------------------------------------------------------------------------
++`ifndef NO_JAGUAR_CD
+ _butch butch_inst
+ (
+ 	.resetl          (xresetl),
+@@ -1517,6 +1530,30 @@
+ 	.cd_sector2448   (cd_sector2448),
+ 	.sys_clk         (sys_clk)
+ );
++`else
++assign b_dout          = 32'h0;
++assign b_doe           = 1'b0;      // cart_qt falls through to cart_q
++assign b_eint          = 1'b1;      // external interrupt inactive (cf. j_xeint[1])
++assign b_xsck_oe       = 1'b0;      // j_xsck_in / j_xws_in fall through to 1'b1
++assign b_xsck_out      = 1'b1;
++assign b_xws_out       = 1'b1;
++assign b_ee_cs         = 1'b0;      // CD-side 93C46 deselected
++assign b_ee_sk         = 1'b0;
++assign b_ee_din        = 1'b0;
++assign hackbus         = 1'b0;      // fx68k_din takes the plain dbus path
++assign hackbus1        = 1'b0;
++assign hackbus2        = 1'b0;
++assign audbus_out      = 30'h0;
++assign aud_ce          = 1'b0;
++assign addr_ch3        = 24'h543210; // Butch's reset value: identity map of cart 1 MB segments 0-5 (sdram_dual ch_tmp). NOT 0, which aliases them all onto one region
++assign b_override      = 1'b0;
++assign overflow        = 1'b0;
++assign underflow       = 1'b0;
++assign errflow         = 1'b0;
++assign unhandled       = 1'b0;
++// cd_valid and cd_sector2448 are INPUTS to this module, so there is
++// nothing to tie off here; jaguar_top drives them.
++`endif
+ wire b_xsck_oe;
+ wire b_xsck_out;
+ wire b_xws_oe = b_xsck_oe;

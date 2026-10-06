@@ -1,0 +1,41 @@
+# Adds ch2_rd_busy: high from a ch2 READ request until its data is latched
+# into ch2_dout (data_ready_delay2[0]). The wrapper drives Tom's xwaitl from it
+# so a cart/BIOS ROM cycle cannot end before SDRAM has delivered. Upstream
+# ties xwaitl high; ch2 is served only from STATE_IDLE behind ch1 and refresh,
+# so under DRAM load a ROM cycle could latch the previous read's data.
+# ch2_ready is not usable for this: STATE_IDLE re-asserts it every cycle even
+# while a ch2 request is still queued.
+--- rtl/upstream/mem/sdram_dual.sv
++++ rtl/upstream/mem/sdram_dual.sv
+@@ -80,6 +80,7 @@
+ 	input             ch2_rnw,     // 1 - read, 0 - write
+ 	input      [1:0]  ch2_be,      // Byte enable (bits) for writes.
+ 	output reg        ch2_ready,
++	output reg        ch2_rd_busy = 1'b0, // a ch2 READ is queued or in flight (Pocket port)
+ 
+ 	input      [23:0] ch3_addr,    // 24 bit address for 8bit mode. addr[0] = 0 for 16bit mode for correct operations.
+ 	output reg [31:0] ch3_dout,    // data output to cpu
+@@ -224,6 +225,7 @@
+ 	if(data_ready_delay2[1]) ch2_dout[31:16] <= dq_reg;
+ 	if(data_ready_delay2[0]) ch2_dout[15:00] <= dq_reg;
+ 	if(data_ready_delay2[0]) ch2_ready <= 1;
++	if(data_ready_delay2[0]) ch2_rd_busy <= 0;
+ 
+ 	`DQ_IDLE;
+ 	if (ch2_req) begin
+@@ -233,6 +235,7 @@
+ 		ch2_add_ext <= ch2_addr_ext;
+ 		ch2_wr      <= !ch2_rnw;
+ 		ch2_ready   <= 0;
++		ch2_rd_busy <= ch2_rnw;
+ 		ch_temp     <= ch_tmp;
+ 	end
+ 	if (ch1_reqr) begin
+@@ -489,6 +492,7 @@
+ 		state <= STATE_STARTUP;
+ 		refresh_count <= startup_refresh_max - sdram_startup_cycles;
+ 		ch2_ready <= 0;
++		ch2_rd_busy <= 0;
+ 	end
+ end
+ wire [3:0] ch_tmp = ch2_addr[23:20]==4'h5 ? ch3_addr[23:20] : ch2_addr[23:20]==4'h4 ? ch3_addr[19:16] : ch2_addr[23:20]==4'h3 ? ch3_addr[15:12]

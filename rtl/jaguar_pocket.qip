@@ -1,0 +1,38 @@
+# Jaguar console sources for the Pocket build.
+#
+# Derived from Jaguar_MiSTer's files.qip. Everything under upstream/ is verbatim
+# and must not be hand-edited (see tools/sync-upstream.sh).
+#
+# Dropped relative to upstream files.qip:
+#   Jaguar.sv        -> replaced by rtl/jaguar_top.sv
+#   Jaguar.sdc       -> replaced by target/pocket/core_constraints.sdc
+#   mem/ddram.sv     -> Pocket has no DDR3                        (docs/04)
+#   auto_crt_ar.sv   -> APF owns aspect/scaling                   (docs/06)
+#   numstick.sv      -> re-added at M6                            (docs/07)
+#   cheatcodes.sv    -> re-added at M6                            (docs/02)
+#   cd_stream.sv     -> CD support out of scope until M6+          (docs/05)
+#   save_slot.sv     -> saves out of scope until M5/M6             (docs/05)
+
+set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) jaguar_top.sv ]
+# Stage B SRAM cache
+set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) sram_cache.sv ]
+# Self-selecting block cache
+set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) blkcache.sv ]
+
+set_global_assignment -name QIP_FILE           [file join $::quartus(qip_path) upstream/jaguar.qip ]
+
+set_global_assignment -name VERILOG_FILE       [file join $::quartus(qip_path) upstream/nuked-68k/68k.v ]
+
+# Instantiated inside jaguar.v, so required even though their inputs are tied
+# off for M1. The fitter prunes the unreachable logic.
+set_global_assignment -name VERILOG_FILE       [file join $::quartus(qip_path) upstream/jag_controller_mux.v ]
+set_global_assignment -name VERILOG_FILE       [file join $::quartus(qip_path) upstream/jag_team_tap.v ]
+set_global_assignment -name VERILOG_FILE       [file join $::quartus(qip_path) upstream/gamedrive.v ]
+set_global_assignment -name VERILOG_FILE       [file join $::quartus(qip_path) upstream/ps2_mouse.v ]
+set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) upstream/jag_lightgun.sv ]
+set_global_assignment -name VERILOG_FILE       [file join $::quartus(qip_path) upstream/eeprom_93c46_x16.v ]
+set_global_assignment -name VERILOG_FILE       [file join $::quartus(qip_path) upstream/tda1545a.v ]
+
+# Memory
+set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) upstream/mem/sdram_dual.sv ]
+set_global_assignment -name VHDL_FILE          [file join $::quartus(qip_path) upstream/mem/bram.vhd ]

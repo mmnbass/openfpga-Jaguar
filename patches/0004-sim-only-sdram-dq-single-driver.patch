@@ -1,0 +1,142 @@
+# SIMULATION-ONLY change, guarded by `ifdef VERILATOR. Quartus takes the `else
+# branch and sees the original tri-state assignments unchanged.
+#
+# sdram_dual.sv declares SDRAM_DQ as `inout reg` and drives it from nine
+# separate procedural assignment sites. Verilator turns that into an
+# out/enable pair and treats EACH site as its own latched driver, then
+# OR-resolves them -- so every SDRAM write came back OR'd with every earlier
+# one: 0x0000, then 0x0002, then a write of 0x0001 reached the bus as 0x0003.
+# All SDRAM traffic was corrupted, which made the real BIOS fail its RAM test
+# and never reach video setup.
+#
+# Confirmed by printing the controller's own SDRAM_DQ next to the bus value:
+# the controller itself held 0x0003, so the bus resolution was innocent.
+# Changing the idle value from Z to 0 does NOT fix it, because the
+# accumulation is across assignment SITES rather than across the idle value.
+# The fix routes all nine through DQ_IDLE / DQ_DRIVE onto one driver.
+--- refs/Jaguar_MiSTer/rtl/mem/sdram_dual.sv	2026-10-02 14:51:02
+--- refs/Jaguar_MiSTer/rtl/mem/sdram_dual.sv	2026-10-02 14:51:02
++++ rtl/upstream/mem/sdram_dual.sv	2026-10-02 22:37:36
+@@ -41,7 +41,11 @@
+ 	input             init,        // reset to initialize RAM
+ 	input             clk,         // clock ~100MHz
+ 
++`ifdef VERILATOR
++	inout wire [15:0] SDRAM_DQ,    // 16 bit bidirectional data bus
++`else
+ 	inout  reg [15:0] SDRAM_DQ,    // 16 bit bidirectional data bus
++`endif
+ 	output reg [12:0] SDRAM_A,     // 13 bit multiplexed address bus
+ 	output            SDRAM_DQML,  // two byte masks
+ 	output            SDRAM_DQMH,  //
+@@ -89,6 +93,30 @@
+ 	input             self_refresh // 1 - self control, 0 - refresh on ch1_ref
+ );
+ 
++// SIMULATION ONLY. Quartus takes the `else branch and sees the original
++// tri-state assignments unchanged.
++//
++// The simulator turns an `inout reg` into an out/enable pair and treats each
++// procedural assignment site as its own latched driver, OR-resolving them all.
++// With nine assignment sites in this module, every SDRAM write came back OR'd
++// with every earlier one (0x0000, then 0x0002, then a write of 0x0001 reached
++// the bus as 0x0003). That corrupted all SDRAM traffic, so the real BIOS failed
++// its RAM test and never reached video setup. Idling at 0 does not help: the
++// accumulation is across assignment SITES. The fix is to drive the bus from
++// exactly one place.
++`ifdef VERILATOR
++reg [15:0] dq_out_r = 16'h0;
++reg        dq_oe_r  = 1'b0;
++// Idle at 0, not Z: sim/sdram_model.sv also idles at 0, so with OR-resolution
++// exactly one side contributes at a time.
++assign SDRAM_DQ = dq_oe_r ? dq_out_r : 16'h0000;
++`define DQ_IDLE      dq_oe_r <= 1'b0
++`define DQ_DRIVE(v)  begin dq_out_r <= (v); dq_oe_r <= 1'b1; end
++`else
++`define DQ_IDLE      SDRAM_DQ <= 16'bZ
++`define DQ_DRIVE(v)  SDRAM_DQ <= (v)
++`endif
++
+ assign SDRAM_nCS  = 0;
+ assign SDRAM_nRAS = command[2];
+ assign SDRAM_nCAS = command[1];
+@@ -197,8 +225,7 @@
+ 	if(data_ready_delay2[0]) ch2_dout[15:00] <= dq_reg;
+ 	if(data_ready_delay2[0]) ch2_ready <= 1;
+ 
+-	SDRAM_DQ <= 16'bZ;
+-
++	`DQ_IDLE;
+ 	if (ch2_req) begin
+ 		ch2_rq      <= 1;
+ 		ch2_data    <= ch2_din;
+@@ -249,21 +276,21 @@
+ 				// activate bank 0
+ 				SDRAM_A <= {13'h0000}; // no auto precharge
+ 				command  <= CMD_WRITE;
+-				SDRAM_DQ <= 16'h0;
++				`DQ_DRIVE(16'h0);
+ 				SDRAM_A[12:11] <= 2'b00; //~be; always write
+ 			end
+ 			if (refresh_count == startup_refresh_max-28) begin
+ 				// Write 2 to column 0
+ 				SDRAM_A <= {13'h0000}; // no auto precharge
+ 				command  <= CMD_WRITE;
+-				SDRAM_DQ <= 16'h2;
++				`DQ_DRIVE(16'h2);
+ 				SDRAM_A[12:11] <= 2'b00; //~be; always write
+ 			end
+ 			if (refresh_count == startup_refresh_max-27) begin
+ 				// Write 1 to column bit-9
+ 				SDRAM_A <= {13'h0200}; // no auto precharge
+ 				command  <= CMD_WRITE;
+-				SDRAM_DQ <= 16'h1;
++				`DQ_DRIVE(16'h1);
+ 				SDRAM_A[12:11] <= 2'b00; //~be; always write
+ 			end
+ 			if (refresh_count == startup_refresh_max-26) begin
+@@ -354,7 +381,7 @@
+ 														// Note: this will only work for accesses where we're in STATE_IDLE when ch1_req pulses High.
+ 				{SDRAM_BA,SDRAM_A} <= {2'b00,2'b00,1'b0,1'b0,ch1_caddr[7:0],1'b0}; // no auto precharge
+ 				command  <= CMD_WRITE;
+-				SDRAM_DQ <= ch1_din[31:16];
++				`DQ_DRIVE(ch1_din[31:16]);
+ 				SDRAM_A[12:11] <= ~ch1_be[3:2];
+ 				state <= STATE_RW2;
+ 				saved_data <= ch1_din;
+@@ -386,7 +413,7 @@
+ 			SDRAM_A <= cas_addr;
+ 			if(saved_wr) begin
+ 				command  <= CMD_WRITE;
+-				SDRAM_DQ <= saved_data[31:16];
++				`DQ_DRIVE(saved_data[31:16]);
+ 				SDRAM_A[12:11] <= saved_mask[3:2];//(ch == 0) ? saved_mask[3:2] : 2'b00; //~be; always write
+ 				state <= (ch == 0) ? STATE_RW2 : STATE_IDLE_3;
+ 			end else if (ch == 1) begin
+@@ -402,7 +429,7 @@
+ 			if (saved_wr) begin
+ 				state       <= ch1_64 ? STATE_RW3 : STATE_IDLE;
+ 				command     <= CMD_WRITE;
+-				SDRAM_DQ <= saved_data[15:0];
++				`DQ_DRIVE(saved_data[15:0]);
+ 				SDRAM_A[12:11] <= saved_mask[1:0];
+ 				SDRAM_A[0] <= 1'b1;
+ 				ch1_ready   <= ch1_64 ? 1'b0 : 1'b1;
+@@ -416,7 +443,7 @@
+ 		STATE_RW3: begin
+ 			state       <= STATE_RW4;
+ 			command     <= CMD_WRITE;
+-			SDRAM_DQ <= saved_data[63:48];
++			`DQ_DRIVE(saved_data[63:48]);
+ 			SDRAM_A[12:11] <= saved_mask[7:6];
+ 			SDRAM_BA <= {2'b01};
+ 			SDRAM_A[0] <= 1'b0;
+@@ -425,7 +452,7 @@
+ 		STATE_RW4: begin
+ 			state       <= STATE_IDLE;
+ 			command     <= CMD_WRITE;
+-			SDRAM_DQ <= saved_data[47:32];
++			`DQ_DRIVE(saved_data[47:32]);
+ 			SDRAM_A[12:11] <= saved_mask[5:4];
+ 			SDRAM_A[0] <= 1'b1;
+ 			ch1_ready   <= 1;

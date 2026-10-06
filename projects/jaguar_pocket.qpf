@@ -1,0 +1,4 @@
+QUARTUS_VERSION = "21.1"
+
+# Revisions
+PROJECT_REVISION = "jaguar_pocket"

@@ -1,0 +1,43 @@
+{
+  "data": {
+    "magic": "APF_VER_1",
+    "data_slots": [
+      {
+        "name": "Cartridge",
+        "id": 1,
+        "required": true,
+        "parameters": "0x09",
+        "extensions": [
+          "jag",
+          "j64",
+          "rom",
+          "bin",
+          "abs",
+          "cof"
+        ],
+        "address": "0x10000000"
+      },
+      {
+        "name": "Jaguar BIOS",
+        "id": 2,
+        "required": true,
+        "parameters": "0x01",
+        "filename": "jagboot.rom",
+        "address": "0x20000000",
+        "size_maximum": "0x20000"
+      },
+      {
+        "name": "Save",
+        "id": 10,
+        "required": false,
+        "parameters": "0x84",
+        "nonvolatile": true,
+        "extensions": [
+          "sav"
+        ],
+        "address": "0x30000000",
+        "size_maximum": "0x800"
+      }
+    ]
+  }
+}

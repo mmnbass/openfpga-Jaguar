@@ -1,0 +1,22 @@
+# Portability fix, functionally a no-op: abus.v declares `wire fcl[0];`, which
+# Quartus reads as the range [0:0] (a one-element array, so the later
+# `assign fcl[0] = ~fc[0];` is valid) but strict Verilog reads as a ZERO-element
+# array. Verilator refuses it, which blocks simulating the core at all. [0:0]
+# is explicit and identical for both tools. Worth sending upstream.
+
+--- refs/Jaguar_MiSTer/rtl/Tom/abus.v	2026-10-02 14:51:02
++++ rtl/upstream/Tom/abus.v	2026-10-02 22:12:28
+@@ -169,7 +169,12 @@
+ wire [1:0] m;
+ wire intd0;
+ wire intd1;
+-wire fcl[0];
++// `wire fcl[0];` upstream. Quartus reads [0] as the range [0:0], giving a
++// one-element array, so `fcl[0]` below is valid. Strict Verilog reads it as
++// a ZERO-element array and Verilator rejects it:
++//   %Error: Size of range is '[0]', must be positive integer
++// [0:0] is explicit and means the same thing to both tools.
++wire fcl[0:0];
+ wire intd;
+ reg ouracki = 1'b0;
+ wire notourack;

@@ -1,0 +1,48 @@
+# Upstream reference clones — fetch with tools/fetch-refs.sh
+refs/
+
+# Quartus build output
+db/
+incremental_db/
+output_files/
+greybox_tmp/
+simulation/
+*.qws
+*.rpt
+*.summary
+*.smsg
+*.jdi
+*.pin
+*.sof
+*.pof
+*.rbf
+*.done
+*.qdf
+*.bak
+
+# Verilator
+obj_dir/
+
+# macOS
+.DS_Store
+
+# Simulation build output
+sim/obj_dir/
+
+# Built packages (produced by tools/, not source)
+dist/
+
+# Never commit a BIOS image
+*.rom
+jagboot*
+
+# Never commit game images or saves
+*.j64
+*.jag
+*.abs
+*.cof
+*.sav
+
+# Local secrets
+.env
+.env.*

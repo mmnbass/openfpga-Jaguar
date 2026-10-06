@@ -1,0 +1,25 @@
+# Pocket-specific glue: APF top-level core, ROM loading, video, audio, PLL.
+
+set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) core_top.sv ]
+set_global_assignment -name VERILOG_FILE       [file join $::quartus(qip_path) core_bridge_cmd.v ]
+set_global_assignment -name SDC_FILE           [file join $::quartus(qip_path) core_constraints.sdc ]
+
+# ROM / BIOS loading from the APF bridge (MIT, from agg23/openfpga-SNES)
+set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) data_loader.sv ]
+
+# CE-domain -> pixel-clock bridge (docs/06)
+set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) jaguar_video.sv ]
+
+# Core PLL: 106.363636 / 26.590909 / 26.590909@90deg from clk_74b (docs/03).
+# Direct altera_pll instantiation -- no IP Catalog regeneration needed.
+set_global_assignment -name VERILOG_FILE       [file join $::quartus(qip_path) mf_pllbase.v ]
+
+# Added at later milestones:
+set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) sound_i2s.sv ]
+set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) sync_fifo.sv ]
+set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) data_unloader.sv ]
+# set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) psram.sv ]          # Stage B
+# SRAM size/speed probe; no longer instantiated, kept for re-measurement.
+# Tcl: no trailing comments on assignment lines.
+# set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) sram_probe.sv ]
+set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) pad_map.sv ]
