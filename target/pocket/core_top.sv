@@ -690,8 +690,19 @@ always @(posedge clk_sys) begin
     c2_s1 <= cont2_key[15:0];  c2_s2 <= c2_s1;
 end
     wire [31:0] joy0, joy1;
-pad_map pad1 (.clk(clk_sys), .k(c1_s2), .l_key(lkey_s), .r_key(rkey_s), .x_key(xkey_s), .shift_en(kshift_s), .jag(joy0));
+    wire [31:0] joy0_pad, joy0_kbd;   // pad_map / kbd_map halves of player 1
+pad_map pad1 (.clk(clk_sys), .k(c1_s2), .l_key(lkey_s), .r_key(rkey_s), .x_key(xkey_s), .shift_en(kshift_s), .jag(joy0_pad));
 pad_map pad2 (.clk(clk_sys), .k(c2_s2), .l_key(lkey_s), .r_key(rkey_s), .x_key(xkey_s), .shift_en(kshift_s), .jag(joy1));
+// Dock USB keyboard on slot 3 -> player 1, alongside the pad: target/pocket/kbd_map.sv.
+// Multi-byte, so kbd_map only takes a report once it is stable.
+    reg [3:0]  k3t_s1 = 0, k3t_s2 = 0;
+    reg [47:0] k3c_s1 = 0, k3c_s2 = 0;
+always @(posedge clk_sys) begin
+    k3t_s1 <= cont3_key[31:28];          k3t_s2 <= k3t_s1;
+    k3c_s1 <= {cont3_joy, cont3_trig};   k3c_s2 <= k3c_s1;
+end
+kbd_map kbd1 (.clk(clk_sys), .type_in(k3t_s2), .codes_hi(k3c_s2[47:16]), .codes_lo(k3c_s2[15:0]), .jag(joy0_kbd));
+joy_merge merge1 (.pad(joy0_pad), .kbd(joy0_kbd), .jag(joy0));   // OR, opposite directions cancelled
     wire        dbg_os_seen;
     wire        dbg_vf_done;
     wire [15:0] dbg_bios_diff, dbg_cart_diff;

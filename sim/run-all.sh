@@ -58,6 +58,9 @@ build_run sram_probe tb_sram_probe target/pocket/sram_probe.sv sim/tb_sram_probe
 # Controller mapping and keypad layer
 # shellcheck disable=SC2086
 build_run pad_map tb_pad_map target/pocket/pad_map.sv sim/tb_pad_map.sv
+# Dock USB keyboard decoder, with pad_map alongside
+# shellcheck disable=SC2086
+build_run kbd_map tb_kbd_map target/pocket/kbd_map.sv target/pocket/pad_map.sv sim/tb_kbd_map.sv
 # shellcheck disable=SC2086
 build_run loader_slots tb_loader_slots $CORE_FILES sim/tb_loader_slots.sv
 # shellcheck disable=SC2086

@@ -8,10 +8,13 @@ Atari's original chip netlists, rather than emulated in software.
 
 ## What works
 
-* Cartridge games: tested titles boot and run with sound and music.
+* Cartridge games: tested titles boot and run (see Known limitations for
+  audio).
 * Saves: games that save to the cartridge EEPROM (Rayman's save slots, for
   example) persist between sessions.
 * Full controller support, including the 12-key number pad (see Controls).
+* **Dock USB keyboard** as player 1, alongside the gamepad, with the full
+  number pad on the number row or numpad (see Dock USB keyboard).
 * Dock output.
 
 ## Installation
@@ -53,6 +56,31 @@ Jaguar keypad, laid out like the real one:
 ```
 
 Tapping Select on its own (pressing nothing else) still sends Option.
+
+### Dock USB keyboard
+
+Plug a USB keyboard into the Analogue Dock. It controls **player 1**,
+together with the player 1 gamepad: both work at the same time.
+
+| Keyboard | Jaguar |
+|---|---|
+| Arrow keys | D-pad |
+| Z / X / C | A / B / C |
+| Enter (main or numpad) | Pause |
+| Tab | Option |
+| 0–9 (number row or numpad) | Keypad 0–9 |
+| `-` or numpad `*` | Keypad * |
+| `=` or numpad `+` | Keypad # |
+
+* Up to six keys can be held at once, so keypad combinations work.
+* Pressing opposite directions together (Left+Right or Up+Down) counts as
+  neither, as on a real Jaguar d-pad, which can't press both. This applies to
+  every player 1 input, keyboard and gamepad, and to one direction on each.
+* The keyboard can be plugged in or unplugged during a game. Unplugging
+  releases any keys it was holding. The Pocket can also leave and rejoin the
+  Dock mid-game.
+* The key layout is fixed. The L, R and X Core Settings apply to the gamepad
+  only.
 
 ### Core Settings
 
@@ -100,6 +128,10 @@ More compatibility reports are very welcome!
   slowdowns seen in testing, but a scene that hammers an unusually large
   amount of memory could still slow briefly.
 * The boot ROM must be supplied by the user.
+* **Audio issues are still under investigation**, including Atari Karts
+  playing without music. Keyboard support does not change the audio.
+* **Dock keyboard:** one keyboard, as player 1 only. Tested with one keyboard
+  and one gamepad on the Dock; setups with more controllers are untested.
 * **Headerless `.rom` dumps** (8 KB shorter than the cartridge, missing its
   header) are not supported yet. Use the `.j64` version of the game.
 
@@ -129,6 +161,7 @@ not affiliated with or endorsed by Atari.
 
 Design notes are in [docs/](docs/).
 Builds run on GitHub Actions (`.github/workflows/m2-fit.yml`, Quartus 21.1);
+the fitter seed is a workflow input (release v0.1.3 used seed 10).
 simulation runs locally with Verilator (`sim/run-all.sh`, `sim/run-boot-tb.sh`).
 
 Build switches (Verilog macros), all off by default:
