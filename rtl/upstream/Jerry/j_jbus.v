@@ -10,6 +10,9 @@ module _j_jbus
 	input [1:0] dmuxu,
 	input dren,
 	input xdsrc,
+`ifdef POCKET_JERRY_WDATA_V3
+	input rws, // Pocket port: jmem readsi -- the direction of the last acknowledged cycle (1 = read)
+`endif
 	input ack,
 	input [31:0] wd,
 	input clk,
@@ -51,7 +54,17 @@ end
 assign d5[15:0] = (dren) ? dr[15:0] : din[15:0];
 
 // JBUS.NET (48) - d1[0-31] : mx2
+`ifdef POCKET_JERRY_WDATA_V3
+// Pocket port: the latch window after a WRITE cycle takes the DSP's write data
+// (wd) even if the bus grant has just dropped. The netlist selects din as soon
+// as xdsrc rises (dbg & writes falls); when the grant was revoked in exactly
+// the clk the latch opens after the ack, the store's data was replaced by the
+// bus input. rws (jmem readsi, latched at the ack) still says "write" then.
+// Atari Karts: Timer 2 divider written as 000f instead of 81d5.
+assign d1[31:0] = (xdsrc & rws) ? din[31:0] : wd[31:0];
+`else
 assign d1[31:0] = (xdsrc) ? din[31:0] : wd[31:0];
+`endif
 
 // JBUS.NET (52) - d1a[8-15] : mx2
 assign d1a[15:8] = (dmuxu[0]) ? d1[7:0] : d1[15:8];

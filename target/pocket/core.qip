@@ -24,3 +24,5 @@ set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) d
 # set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) sram_probe.sv ]
 set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) pad_map.sv ]
 set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) kbd_map.sv ]
+# POCKET_DRAMINIT: synchroniser with its middle stage brought out (core_top sr_ext)
+set_global_assignment -name SYSTEMVERILOG_FILE [file join $::quartus(qip_path) synch_3_la.sv ]

@@ -32,6 +32,9 @@ module tb_loader_slots;
 
 jaguar_top dut (
     .clk_sys(clk), .clk_ram(clk), .pll_locked(1'b1), .reset(reset),
+`ifdef POCKET_DRAMINIT
+    .sr_ext(reset | download_active),          // trivially equal here: no synchroniser in this bench
+`endif
     .cart_wr(cart_wr), .cart_addr(cart_addr), .cart_data(cart_data),
     .bios_wr(bios_wr), .bios_addr(bios_addr), .bios_data(bios_data),
     .download_active(download_active),
@@ -106,6 +109,9 @@ sdram_model mem (.clk(dram_clk), .dq(dram_dq), .a(dram_a), .ba(dram_ba),
         for (int i = 0; i < NW; i += 2) write_pair(0, i*2, cart_val(i), cart_val(i+1));   // slot 1: cart
         for (int i = 0; i < NW; i += 2) write_pair(1, i*2, bios_val(i), bios_val(i+1));   // slot 2: BIOS
         download_active = 0;
+`ifdef POCKET_DRAMINIT
+        reset = 0;                          // the DRAM init pass runs only out of reset, and holds ld_busy until it is done
+`endif
         wait (!dut.ld_busy);                // loader write queue drained
 `ifdef POCKET_DIAG
         wait (vf_done);

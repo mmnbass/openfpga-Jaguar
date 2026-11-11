@@ -35,6 +35,9 @@ module tb_jaguar_boot;
 
 jaguar_top dut (
     .clk_sys(clk), .clk_ram(clk), .pll_locked(1'b1), .reset(reset),
+`ifdef POCKET_DRAMINIT
+    .sr_ext(reset | download_active),          // trivially equal here: no synchroniser in this bench
+`endif
     .cart_wr(cart_wr), .cart_addr(cart_addr), .cart_data(cart_data),
     .bios_wr(bios_wr), .bios_addr(bios_addr), .bios_data(bios_data),
     .download_active(download_active),

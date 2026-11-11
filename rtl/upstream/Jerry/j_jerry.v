@@ -548,6 +548,9 @@ _j_jbus jbus_inst
 	.dmuxu /* IN */ (dmuxu[1:0]),
 	.dren /* IN */ (dren),
 	.xdsrc /* IN */ (xdsrc),
+`ifdef POCKET_JERRY_WDATA_V3
+	.rws /* IN */ (rws), // Pocket port
+`endif
 	.ack /* IN */ (ack),
 	.wd /* IN */ (wd[31:0]),
 	.clk /* IN */ (clk),

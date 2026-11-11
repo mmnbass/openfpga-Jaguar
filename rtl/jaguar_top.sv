@@ -30,6 +30,10 @@ module jaguar_top #(
     input  wire        clk_ram,        // 106.363636 MHz (same net; separate port for clarity)
     input  wire        pll_locked,
     input  wire        reset,
+`ifdef POCKET_DRAMINIT
+    input  wire        sr_ext,         // == (reset without the PLL term) | download_active on every clk_ram edge,
+                                       // from a register (core_top); feeds only the SDRAM self-refresh request
+`endif
 
     // ---- ROM / BIOS loading, from the APF data_loaders (docs/05) ----------
     input  wire        cart_wr,
@@ -203,6 +207,86 @@ module jaguar_top #(
     reg  [5:0]  lq_t   = 0;
     reg         dbg_lq_ovf_r = 0;
     assign      dbg_lq_ovf = dbg_lq_ovf_r;
+`ifdef POCKET_DRAMINIT
+// ---- Jaguar DRAM init (POCKET_DRAMINIT) ----------------------------------------
+// Zeroes Jaguar 0x000-0x7FF (row 0, SDRAM banks 0/1) before the console's first
+// release after a controller init (configuration, or PLL loss). It is a late stage
+// of the loader: di_hold extends ld_busy, so the console hold, self-refresh, cache
+// reset and ch2 source select all behave exactly as during a load. An entry goes
+// straight into lq_cur when the queue is empty, so the host always wins, a host
+// write can't lose a slot, and at most one init entry exists. lq_dram (latched by
+// sdram_dual with the request) sends that entry to banks 0/1; it is low for every
+// other request. A stop during the pass restarts it from word 0; an entry in flight
+// finishes as a zero write.
+//   Once a pass has finished (di_done) a reset or download changes nothing here, so
+// the core behaves as without this block: Tom may leave a row open or an ACT pending
+// in the controller at such a reset, and init would not be safe. Tom has not run
+// before di_done is first set. di_done needs a real clear: a set-only flag is stuck
+// high after Quartus's power-up don't care, leaving the engine silently disabled.
+//   Entry address {bank ? 4'h8 : 4'h0, row, cas[7:0], half}: ch1's word layout.
+    reg         di_hold = 1'b1;         // holds the console; done when it falls
+    reg         di_done = 1'b0;         // a pass has finished since controller init
+    reg         di_last = 1'b0;         // the last entry has been issued
+    reg  [9:0]  di_n    = 10'd0;        // {cas[7:0], bank, half}
+    reg  [13:0] di_wait = 14'd0;        // after every stop: covers the controller's 12,100 clk
+                                        // startup and the row Tom leaves open at a hot reset
+    reg         lq_dram = 1'b0;
+    wire        di_ctrl_init;           // assigned with sdram_pwr_ok
+    wire        di_stop = reset | download_active | di_ctrl_init;
+    wire        di_go   = di_hold & !di_last & !di_stop & (&di_wait) & lq_empty & (lq_t == 0);
+    assign      ld_busy = download_active | !lq_empty | (lq_t != 0) | di_hold;
+always @(posedge clk_sys) begin
+    lq_req <= 1'b0;
+    if (loader_en && loader_wr) begin
+        if (!lq_full) begin
+            lq_mem[lq_w] <= {os_index, loader_addr[23:1], loader_data_bs};
+            lq_w <= lq_w + 1'b1;
+        end else dbg_lq_ovf_r <= 1'b1;
+    end
+    if (lq_t != 0) lq_t <= lq_t - 1'b1;
+    else begin
+        lq_dram <= 1'b0;
+        if (!lq_empty) begin
+            lq_cur <= lq_mem[lq_r];
+            lq_r   <= lq_r + 1'b1;
+            lq_req <= 1'b1;
+            lq_t   <= LQ_GAP[5:0] - 1'b1;
+        end else if (di_go) begin
+            lq_cur  <= {1'b0, di_n[1] ? 4'h8 : 4'h0, 10'd0, di_n[9:2], di_n[0], 16'h0000};
+            lq_dram <= 1'b1;
+            lq_req  <= 1'b1;
+            lq_t    <= LQ_GAP[5:0] - 1'b1;
+        end
+    end
+    if (di_stop) begin
+        di_hold <= !di_done | di_ctrl_init;
+        di_last <= 1'b0;
+        di_n    <= 10'd0;
+        di_wait <= 14'd0;
+    end else if (!(&di_wait)) di_wait <= di_wait + 1'b1;
+    else if (di_last) begin
+        if (lq_t == 0) begin            // the last entry's LQ_GAP has expired
+            di_hold <= 1'b0;
+            di_done <= 1'b1;
+        end
+    end else if (di_go) begin
+        di_n <= di_n + 1'b1;
+        if (&di_n) di_last <= 1'b1;
+    end
+    if (di_ctrl_init) di_done <= 1'b0;
+end
+// The diagnostic verifier is a second user of this ch2 side, and the fixed and
+// SRAM caches are filled by ch1 writes only, so these fail the build on purpose.
+`ifdef POCKET_DIAG
+    draminit_unsupported_with_POCKET_DIAG        unsupported_diag ();
+`endif
+`ifdef POCKET_FIXED_CACHE
+    draminit_unsupported_with_POCKET_FIXED_CACHE unsupported_fixed_cache ();
+`endif
+`ifdef POCKET_SRAM_CACHE
+    draminit_unsupported_with_POCKET_SRAM_CACHE  unsupported_sram_cache ();
+`endif
+`else
     assign      ld_busy = download_active | !lq_empty | (lq_t != 0);
 always @(posedge clk_sys) begin
     lq_req <= 1'b0;
@@ -220,6 +304,7 @@ always @(posedge clk_sys) begin
         lq_t   <= LQ_GAP[5:0] - 1'b1;
     end
 end
+`endif
 
 // Cart size mask (Jaguar.sv:523-538). Track one past the last cart byte
 // written, then classify when the transfer ends.
@@ -814,6 +899,9 @@ always @(posedge clk_sys)
 always @(posedge clk_ram)
     if (!pll_locked)         sdram_pwr_cnt <= 0;
     else if (!sdram_pwr_ok)  sdram_pwr_cnt <= sdram_pwr_cnt + 1'b1;
+`ifdef POCKET_DRAMINIT
+    assign      di_ctrl_init  = ~pll_locked | ~sdram_pwr_ok;
+`endif
 
 // SDRAM ch2: cart ROM and BIOS    (Jaguar.sv:1364-1446)
 // =============================================================================
@@ -971,6 +1059,11 @@ assign os_rom_q = (((abus_out[16:0] == 17'h0136E && !bios_m) ||
 // SDRAM controller
 // =============================================================================
     wire ram64;
+`ifdef POCKET_DRAMINIT
+    // Same value as loader_en || !sdram_xresetlp on every clock: sr_ext carries reset and download_active
+    // from a register, the PLL term stays as it was, and the loader and init terms are local registers.
+    wire sdram_self_refresh = sr_ext | ~pll_locked | !lq_empty | (lq_t != 0) | di_hold | vf_busy;
+`endif
 
 sdram sdram (
     .init               ( ~pll_locked | ~sdram_pwr_ok ),
@@ -1013,6 +1106,10 @@ sdram sdram (
     .ch2_be             ( cart_ch2_be ),
     .ch2_ready          ( sdram_ch2_ready ),
     .ch2_rd_busy        ( ch2_rd_busy ),
+`ifdef POCKET_DRAMINIT
+    .ch2_dram           ( lq_dram ),
+    .ch2_dram_en        ( di_hold ),
+`endif
 
     .ch3_addr           ( addr_ch3 ),
     .ch3_dout           ( ),
@@ -1022,7 +1119,11 @@ sdram sdram (
     .ch3_ready          ( ),
 
     .ram64              ( ram64 ),
+`ifdef POCKET_DRAMINIT
+    .self_refresh       ( sdram_self_refresh )
+`else
     .self_refresh       ( loader_en || !sdram_xresetlp )
+`endif
 );
 
 endmodule

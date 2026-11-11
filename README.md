@@ -99,7 +99,8 @@ Option button. Remapped buttons still work through the Select layer as well.
 
 ## Compatibility
 
-Tested on hardware:
+Tested on hardware (mostly on earlier releases; v0.2.0 was tested mainly with
+Atari Karts, Rayman and Tempest 2000):
 
 * Alien vs Predator
 * Atari Karts
@@ -128,8 +129,9 @@ More compatibility reports are very welcome!
   slowdowns seen in testing, but a scene that hammers an unusually large
   amount of memory could still slow briefly.
 * The boot ROM must be supplied by the user.
-* **Audio issues are still under investigation**, including Atari Karts
-  playing without music. Keyboard support does not change the audio.
+* **Audio:** v0.2.0 fixes the Atari Karts music and addresses games starting
+  without sound after the Pocket has been off. Both were tested mainly with
+  Atari Karts; please report any game that still starts silent.
 * **Dock keyboard:** one keyboard, as player 1 only. Tested with one keyboard
   and one gamepad on the Dock; setups with more controllers are untested.
 * **Headerless `.rom` dumps** (8 KB shorter than the cartridge, missing its
@@ -161,13 +163,35 @@ not affiliated with or endorsed by Atari.
 
 Design notes are in [docs/](docs/).
 Builds run on GitHub Actions (`.github/workflows/m2-fit.yml`, Quartus 21.1);
-the fitter seed is a workflow input (release v0.1.3 used seed 10).
-simulation runs locally with Verilator (`sim/run-all.sh`, `sim/run-boot-tb.sh`).
+the fitter seed and extra Verilog macros are workflow inputs.
+Simulation runs locally with Verilator (`sim/run-all.sh`, `sim/run-boot-tb.sh`).
 
-Build switches (Verilog macros), all off by default:
+### Building release v0.2.0
+
+Release v0.2.0 is built from this source with fitter **seed 1** and two macros on:
+
+    gh workflow run m2-fit.yml -f revision=jaguar_pocket -f seed=1 \
+        -f defines="POCKET_JERRY_WDATA_V3 POCKET_DRAMINIT"
+
+`defines` takes macro names only: the workflow appends
+`set_global_assignment -name SEED 1` and one
+`set_global_assignment -name VERILOG_MACRO "<name>=1"` line per macro to
+`projects/jaguar_pocket.qsf` before compiling. For a local Quartus build, append
+the same three lines. The macros are not set in the `.qsf` itself, so a build
+with the default inputs gives a core without the v0.2.0 audio fixes.
+
+The release's `bitstream.rbf_r` is the bit-reversed `jaguar_pocket.rbf`
+(`tools/reverse-rbf.py`; `tools/package.sh` does this when packaging).
+Release v0.1.3 was built with seed 10 and no macros.
+
+### Build switches
+
+Verilog macros, off unless set at build time:
 
 | Macro | Effect |
 |---|---|
+| `POCKET_JERRY_WDATA_V3` | Jerry write-data fix (Atari Karts music). **On in release v0.2.0** |
+| `POCKET_DRAMINIT` | Clears the first 2 KB of Jaguar DRAM before the console starts (cold-start audio). **On in release v0.2.0**; cannot be combined with `POCKET_DIAG`, `POCKET_FIXED_CACHE` or `POCKET_SRAM_CACHE` (the build stops) |
 | `POCKET_DIAG` | On-screen diagnostic overlay (status squares, memory-traffic bars) |
 | `POCKET_FIXED_CACHE` | Upstream's fixed-region caches instead of the self-tuning cache |
 | `POCKET_SRAM_CACHE` | Experimental external-SRAM cache (shelved: glitches on hardware) |

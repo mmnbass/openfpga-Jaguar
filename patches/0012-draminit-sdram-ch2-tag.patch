@@ -1,0 +1,135 @@
+# POCKET_DRAMINIT (off by default; off = unchanged). Used by rtl/jaguar_top.sv.
+# ch2_dram tags a ch2 request for Jaguar DRAM (BA 0/1 instead of BA[1] = 1);
+# ch2_dram_en low clears the tag, so it is 0 before the console's first request.
+# refresh_due is a register equal to (refresh_count > cycles_per_refresh) on every
+# clock, so STATE_IDLE reads a register instead of a 14-bit compare. Startup also
+# clears the pending ch1/ch2 request flags, so init's first ACT finds the banks idle.
+--- rtl/upstream/mem/sdram_dual.sv
++++ rtl/upstream/mem/sdram_dual.sv
+@@ -83,6 +83,10 @@
+ 	input      [1:0]  ch2_be,      // Byte enable (bits) for writes.
+ 	output reg        ch2_ready,
+ 	output reg        ch2_rd_busy = 1'b0, // a ch2 READ is queued or in flight (Pocket port)
++`ifdef POCKET_DRAMINIT
++	input             ch2_dram,    // this ch2 request targets Jaguar DRAM, BA 0/1 (Pocket port)
++	input             ch2_dram_en, // the init pass is running; low clears the request's DRAM tag (Pocket port)
++`endif
+ 
+ 	input      [23:0] ch3_addr,    // 24 bit address for 8bit mode. addr[0] = 0 for 16bit mode for correct operations.
+ 	output reg [31:0] ch3_dout,    // data output to cpu
+@@ -153,6 +157,13 @@
+ wire [2:0] CMD_LOAD_MODE       = 3'b000;
+ 
+ reg [13:0] refresh_count = startup_refresh_max - sdram_startup_cycles;
++`ifdef POCKET_DRAMINIT
++// refresh_due == (refresh_count > cycles_per_refresh) on every clock: assigned next to each refresh_count
++// assignment from the same expression, so STATE_IDLE reads a register rather than a 14-bit compare.
++wire [13:0] rc_inc  = refresh_count + 1'b1;
++wire [13:0] rc_rfsh = refresh_count - cycles_per_refresh + 1'd1;
++reg        refresh_due;
++`endif
+ reg  [2:0] command;
+ 
+ localparam STATE_STARTUP = 0;
+@@ -192,6 +203,9 @@
+ 	reg [23:1] ch2_add;
+ 	reg        ch2_add_ext;
+ 	reg        ch2_wr;
++`ifdef POCKET_DRAMINIT
++	reg        ch2_add_dram;
++`endif
+ 
+ 	reg [31:0] ch3_data;
+ 	reg [22:1] ch3_add;
+@@ -210,6 +224,9 @@
+ 	ch1_pc <= (ch1_pc | ch1_pch) && ch1_active;
+ 
+ 	refresh_count <= refresh_count+1'b1;
++`ifdef POCKET_DRAMINIT
++	refresh_due   <= rc_inc > cycles_per_refresh;
++`endif
+ 
+ 	data_ready_delay1 <= data_ready_delay1>>1;
+ 	data_ready_delay2 <= data_ready_delay2>>1;
+@@ -237,10 +254,18 @@
+ 		ch2_add     <= ch2_addr;
+ 		ch2_add_ext <= ch2_addr_ext;
+ 		ch2_wr      <= !ch2_rnw;
++`ifdef POCKET_DRAMINIT
++		ch2_add_dram <= ch2_dram;
++`endif
+ 		ch2_ready   <= 0;
+ 		ch2_rd_busy <= ch2_rnw;
+ 		ch_temp     <= ch_tmp;
+ 	end
++`ifdef POCKET_DRAMINIT
++	// The tag is read only when a ch2 request is taken in STATE_IDLE. Clearing it here means it is
++	// already 0 before the console's first request, so that request's timing can't change it.
++	if (!ch2_dram_en) ch2_add_dram <= 1'b0;
++`endif
+ 	if (ch1_reqr) begin
+ 		saved_addr <= ch1_addr;
+ 		ch1_ontime <= 0;            // set below only if the READ goes out this cycle
+@@ -318,6 +343,9 @@
+ 			if (!refresh_count) begin
+ 				state   <= STATE_IDLE;
+ 				refresh_count <= 0;
++`ifdef POCKET_DRAMINIT
++				refresh_due   <= 1'b0;
++`endif
+ 			end
+ 		end
+ 
+@@ -336,13 +364,20 @@
+ 			state    <= STATE_IDLE_6;
+ 			command  <= CMD_AUTO_REFRESH;
+ 			refresh_count <= refresh_count - cycles_per_refresh + 1'd1;
++`ifdef POCKET_DRAMINIT
++			refresh_due   <= rc_rfsh > cycles_per_refresh;
++`endif
+ 			ch2_ready   <= 0;
+ 		end
+ 
+ 		STATE_IDLE: begin
+ 			ch1_ready   <= 1;
+ 			ch2_ready   <= 1;
++`ifdef POCKET_DRAMINIT
++			if (refresh_due && (self_refresh))  begin
++`else
+ 			if ((refresh_count > cycles_per_refresh) && (self_refresh))  begin
++`endif
+ 				// Priority is to issue a refresh if one is outstanding
+ 				state <= STATE_RFSH;
+ 				ch2_ready   <= 0;
+@@ -400,7 +435,12 @@
+ 			end
+ 			else if(ch2_rq) begin
+ //				{cas_addr[12:9],SDRAM_BA,SDRAM_A,cas_addr[8:0]} <= {2'b00, 1'b1, 1'b0, 1'b1, ch2_add[22:10], 1'b0, ch2_add[9:1]}; // auto precharge
++`ifdef POCKET_DRAMINIT
++				// BA[1] = 0 for Jaguar DRAM (BA 0/1), else 1 as upstream
++				{cas_addr[12:9],SDRAM_BA,SDRAM_A,cas_addr[8:0]} <= {2'b00, 1'b1, ch2_add_ext, ~ch2_add_dram, ch_temp, ch2_add[19:10], ch2_add[9:1]}; // auto precharge
++`else
+ 				{cas_addr[12:9],SDRAM_BA,SDRAM_A,cas_addr[8:0]} <= {2'b00, 1'b1, ch2_add_ext, 1'b1, ch_temp, ch2_add[19:10], ch2_add[9:1]}; // auto precharge
++`endif
+ 				saved_data <= {ch2_data,ch2_data,ch2_data,ch2_data};
+ 				saved_wr   <= ch2_wr;
+ 				saved_mask[3:2] <= ~ch2_be[1:0]; // first write uses [3:2]
+@@ -496,9 +536,18 @@
+ 	if (init) begin
+ 		state <= STATE_STARTUP;
+ 		refresh_count <= startup_refresh_max - sdram_startup_cycles;
++`ifdef POCKET_DRAMINIT
++		refresh_due   <= (startup_refresh_max - sdram_startup_cycles) > cycles_per_refresh;
++`endif
+ 		ch2_ready <= 0;
+ 		ch2_rd_busy <= 0;
+ 		ch1_ontime <= 0;
++`ifdef POCKET_DRAMINIT
++		// Nothing may be pending when startup ends: init's first ACT must find the banks idle.
++		// These flags have no reset, and a pending ACT survives a PLL loss.
++		ch1_rqr <= 0; ch1_rqw <= 0; ch2_rq <= 0;
++		ch1_rf <= 0; ch1_ac <= 0; ch1_pc <= 0; ch1_active <= 0;
++`endif
+ 	end
+ end
+ wire [3:0] ch_tmp = ch2_addr[23:20]==4'h5 ? ch3_addr[23:20] : ch2_addr[23:20]==4'h4 ? ch3_addr[19:16] : ch2_addr[23:20]==4'h3 ? ch3_addr[15:12]

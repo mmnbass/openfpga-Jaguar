@@ -34,6 +34,9 @@ module tb_jaguar_bios;
 
 jaguar_top dut (
     .clk_sys(clk), .clk_ram(clk), .pll_locked(1'b1), .reset(reset),
+`ifdef POCKET_DRAMINIT
+    .sr_ext(reset),          // trivially equal here: no synchroniser in this bench
+`endif
     .cart_wr(1'b0), .cart_addr(25'd0), .cart_data(16'd0),
     .bios_wr(1'b0), .bios_addr(25'd0), .bios_data(16'd0),
     .download_active(1'b0),
@@ -993,6 +996,14 @@ jaguar_video #(.PIPE(2)) jv (
                 mem.scramble(rseed);
             end
         end
+`ifdef POCKET_DRAMINIT
+        // Nonzero garbage in all of row 0 (+draminit_fill), and a count at the release edge.
+        if ($test$plusargs("draminit_fill")) begin
+            for (int b2 = 0; b2 < 2; b2++) for (int c = 0; c < 512; c++)
+                mem.mem[{1'b0, 1'(b2), 13'd0, 1'b0, 9'(c)}] = 16'(16'h1AC3 ^ (c * 40503));
+            $display("draminit: row 0 filled with nonzero content");
+        end
+`endif
         load_bios(bios_path);
         if ($value$plusargs("cart=%s", cart_path)) load_cart(cart_path);
         // The TB preloads SDRAM, bypassing the loader's header sniff, so the
@@ -1044,6 +1055,16 @@ jaguar_video #(.PIPE(2)) jv (
             $display("PIXELS: all black");
         $finish;
     end
+
+`ifdef POCKET_DRAMINIT
+    initial begin
+        int nz = 0;
+        @(posedge dut.xresetlp);
+        for (int b2 = 0; b2 < 2; b2++) for (int c = 0; c < 512; c++)
+            if (mem.mem[{1'b0, 1'(b2), 13'd0, 1'b0, 9'(c)}] !== 16'h0000) nz++;
+        $display("[%0d] draminit: console released, row 0 nonzero words %0d, di_hold %b", cyc, nz, dut.di_hold);
+    end
+`endif
 
     // Guard must scale with the requested run, or it silently truncates it and
     // $finish beats the result display -- which is what happened on a 2000 ms

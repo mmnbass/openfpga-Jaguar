@@ -512,7 +512,12 @@ end
 synch_3 s_pll_lock (pll_core_locked, pll_core_locked_s, clk_74a);
 
     wire            reset_n_s;
+`ifdef POCKET_DRAMINIT
+    wire            reset_n_next;      // reset_n_s on the next clock (sr_ext)
+synch_3_la s_reset_n (reset_n, reset_n_s, reset_n_next, clk_sys);
+`else
 synch_3 s_reset_n  (reset_n, reset_n_s, clk_sys);
+`endif
 
     wire            core_reset = ~reset_n_s | ~pll_core_locked;
 
@@ -631,7 +636,12 @@ always @(posedge clk_74a) begin
 end
 
     wire            download_active_s;
+`ifdef POCKET_DRAMINIT
+    wire            download_active_next;  // download_active_s on the next clock (sr_ext)
+synch_3_la s_dl_active (download_active, download_active_s, download_active_next, clk_sys);
+`else
 synch_3 s_dl_active (download_active, download_active_s, clk_sys);
+`endif
 
 // FAST_SDRAM cache regions from the Pocket menu (interact.json):
 // 0x40000000 = cache A, 0x40000004 = cache B, each a 256 KB region 0-7
@@ -733,11 +743,23 @@ joy_merge merge1 (.pad(joy0_pad), .kbd(joy0_kbd), .jag(joy0));   // OR, opposite
     wire            vga_hs, vga_vs, jag_hblank, jag_vblank, vid_ce, interlaced;
     wire    [15:0]  aud_l, aud_r;
 
+`ifdef POCKET_DRAMINIT
+// The reset and download part of the SDRAM self-refresh request, from one register fed by the
+// synchronisers' middle stages: equal to ~reset_n_s | download_active_s on every clk_sys edge, but it
+// drives only the controller. The PLL term stays asynchronous inside jaguar_top, as before.
+    reg             sr_ext;
+always @(posedge clk_sys)
+    sr_ext <= ~reset_n_next | download_active_next;
+`endif
+
 jaguar_top jaguar_top (
     .clk_sys            ( clk_sys ),
     .clk_ram            ( clk_sys ),      // docs/03: clk_ram == clk_sys == 106.363636 MHz
     .pll_locked         ( pll_core_locked ),
     .reset              ( core_reset ),
+`ifdef POCKET_DRAMINIT
+    .sr_ext             ( sr_ext ),
+`endif
 
     // ROM / BIOS loading (docs/05)
     .cart_wr            ( cart_wr ),
